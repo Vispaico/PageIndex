@@ -191,7 +191,12 @@ def check_if_toc_extraction_is_complete(content, toc, model=None):
     }}
     Directly return the final JSON structure. Do not output anything else."""
 
-    prompt = prompt + '\n Document:\n' + content + '\n Table of contents:\n' + toc
+    prompt = (
+        prompt
+        + '\n Document:\n' + _secure_doc_text(content)
+        + '\n Table of contents:\n' + _secure_doc_text(str(toc))
+    )
+    
     response = llm_completion(model=model, prompt=prompt)
     json_content = extract_json(response)
     return json_content['completed']
@@ -209,7 +214,11 @@ def check_if_toc_transformation_is_complete(content, toc, model=None):
     }}
     Directly return the final JSON structure. Do not output anything else."""
 
-    prompt = prompt + '\n Raw Table of contents:\n' + content + '\n Cleaned Table of contents:\n' + toc
+    prompt = (
+        prompt
+        + '/n Raw Table of contents:\n' + _secure_doc_text(content)
+        + '/n Cleaned Table of contents:\n' + _secure_doc_text(str(toc))
+    )
     response = llm_completion(model=model, prompt=prompt)
     json_content = extract_json(response)
     return json_content['completed']
@@ -218,7 +227,7 @@ def extract_toc_content(content, model=None):
     prompt = f"""
     Your job is to extract the full table of contents from the given text, replace ... with :
 
-    Given text: {content}
+    Given text: {_secure_doc_text(content)}
 
     Directly return the full table of contents content. Do not output anything else."""
 
@@ -295,10 +304,12 @@ def toc_extractor(page_list, toc_page_list, model):
     }
 
 
-
+def _extract_chunk_marker_set(content: str) -> set:
+    return {int(m) for m in re.findall(r"<physical_index_(\d+)>", content)}
 
 def toc_index_extractor(toc, content, model=None):
     print('start toc_index_extractor')
+    valid_indices = _extract_chunk_marker_set(content)
     toc_extractor_prompt = """
     You are given a table of contents in a json format and several pages of a document, your job is to add the physical_index to the table of contents in the json format.
 
@@ -320,13 +331,23 @@ def toc_index_extractor(toc, content, model=None):
     If the section is not in the provided pages, do not add the physical_index to it.
     Directly return the final JSON structure. Do not output anything else."""
 
-    prompt = _SYSTEM_HARDENING + toc_extractor_prompt + '\nTable of contents:\n' + str(toc) + '\nDocument pages:\n' + _secure_doc_text(content)
+    prompt = (
+        _SYSTEM_HARDENING + toc_extractor_prompt
+        + '\nTable of contents:\n' + _secure_doc_text(str(toc))
+        + '\nDocument pages:\n' + _secure_doc_text(content)
+    )
     response = llm_completion(model=model, prompt=prompt)
-    json_content = extract_json(response)    
+    json_content = extract_json(response)
+    for entry in json_content:
+        raw = entry.get("physical_index")
+        if raw is None:
+            continue
+        m = _PHYSICAL_INDEX_MARKER_RE.match(str(raw).strip())
+        if not m or int(m.group(1)) not in valid_indices:
+            entry["physical_index"] = None
+            
     return json_content
-
-
-
+            
 def toc_transformer(toc_content, model=None):
     print('start toc_transformer')
     init_prompt = """
@@ -348,7 +369,7 @@ def toc_transformer(toc_content, model=None):
     You should transform the full table of contents in one go.
     Directly return the final JSON structure, do not output anything else. """
 
-    prompt = init_prompt + '\n Given table of contents\n:' + toc_content
+    prompt = init_prompt + '\n Given table of contents\n:' + _secure_doc_text(toc_content)
     last_complete, finish_reason = llm_completion(model=model, prompt=prompt, return_finish_reason=True)
     if_complete = check_if_toc_transformation_is_complete(toc_content, last_complete, model)
     if if_complete == "yes" and finish_reason == "finished":
