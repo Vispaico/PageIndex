@@ -721,12 +721,12 @@ def process_no_toc(page_list, start_index=1, model=None, logger=None):
             model
         )
         
-        toc_with_page_number_additional = _validate_physical_indices(
+        toc_with_page_number_additional = _validate_chunk_physical_indices(
             toc_with_page_number_additional,
             group_text
         )
         
-        toc_with_page_number_additional = _validate_chunk_physical_indices(
+        toc_with_page_number_additional = _validate_physical_indices(
             toc_with_page_number_additional,
             len(page_list),
             start_index
