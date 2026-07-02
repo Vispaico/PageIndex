@@ -90,7 +90,7 @@ async def check_title_appearance(item, page_list, start_index=1, model=None):
 
     Note: do fuzzy matching, ignore any space inconsistency in the page_text.
 
-    The given section title is {title}.
+    The given section title is {_secure_doc_text(str(title))}.
     The given page_text is:
     {_secure_doc_text(page_text)}
     
@@ -120,7 +120,7 @@ async def check_title_appearance_in_start(title, page_text, model=None, logger=N
 
     Note: do fuzzy matching, ignore any space inconsistency in the page_text.
 
-    The given section title is {title}.
+    The given section title is {_secure_doc_text(str(title))}.
     The given page_text is:
     {_secure_doc_text(page_text)}
     
@@ -755,8 +755,21 @@ def process_toc_no_page_numbers(toc_content, toc_page_list, page_list,  start_in
 
     toc_with_page_number=copy.deepcopy(toc_content)
     for group_text in group_texts:
+        had_index_before = {
+            i for i, e in enumerate(toc_with_page_number)
+            if e.get("physical_index") is not None
+        }
         toc_with_page_number = add_page_number_to_toc(group_text, toc_with_page_number, model)
-        toc_with_page_number = _validate_chunk_physical_indices(toc_with_page_number, group_text)
+        valid_indices = _extract_chunk_marker_set(group_text)
+        for i, entry in enumerate(toc_with_page_number):
+            if i in had_index_before:
+                continue
+            raw = entry.get("physical_index")
+            if raw is None:
+                continue
+            m = _PHYSICAL_INDEX_MARKER_RE.match(str(raw).strip())
+            if not m or int(m.group(1)) not in valid_indices:
+                entry["physical_index"] = None
     logger.info(f'add_page_number_to_toc: {toc_with_page_number}')
 
     toc_with_page_number = convert_physical_index_to_int(toc_with_page_number)
