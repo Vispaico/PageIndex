@@ -784,8 +784,8 @@ def process_toc_no_page_numbers(toc_content, toc_page_list, page_list,  start_in
             if int(m.group(1)) not in valid_indices:
                 continue
                 
-                current["physical_index"] = raw
-    toc_with_page_number = list(current_entries.values())
+            current["physical_index"] = raw
+        toc_with_page_number = list(current_entries.values())
     logger.info(f'add_page_number_to_toc: {toc_with_page_number}')
 
     toc_with_page_number = convert_physical_index_to_int(toc_with_page_number)
