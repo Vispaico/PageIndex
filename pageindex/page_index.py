@@ -755,22 +755,17 @@ def process_toc_no_page_numbers(toc_content, toc_page_list, page_list,  start_in
 
     toc_with_page_number = copy.deepcopy(toc_content)
     for group_text in group_texts:
-        current_entries = {
-            entry["structure"]: entry
-            for entry in toc_with_page_number
-        }
 
         llm_result = add_page_number_to_toc(group_text, toc_with_page_number, model)
+        if len(llm_result) != len(toc_with_page_number):
+            raise ValueError(
+                "LLM returned a different number of TOC entries than expected."
+            )
         valid_indices = _extract_chunk_marker_set(group_text)
         
-        for update in llm_result:
-            key = update.get("structure")
+        for idx, current in enumerate(toc_with_page_number):
+            update = llm_result[idx]
             
-            if key not in current_entries:
-                continue
-
-            current = current_entries[key]
-
             if current.get("physical_index") is not None:
                 continue
                 
@@ -785,7 +780,6 @@ def process_toc_no_page_numbers(toc_content, toc_page_list, page_list,  start_in
                 continue
                 
             current["physical_index"] = raw
-        toc_with_page_number = list(current_entries.values())
     logger.info(f'add_page_number_to_toc: {toc_with_page_number}')
 
     toc_with_page_number = convert_physical_index_to_int(toc_with_page_number)
